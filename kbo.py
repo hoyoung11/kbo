@@ -1,73 +1,74 @@
 import streamlit as st
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 
+# 1. 페이지 설정
 st.set_page_config(page_title="KBO 데이터 센터", layout="wide")
 st.title("⚾ KBO 공식 기록실 & 선수 검색")
 
-# --- 팀 순위표 ---
+# --- [섹션 1] 팀 순위표 (이건 잘 나오죠?) ---
 st.subheader("🏆 KBO 공식 팀 순위")
 url_rank = "https://www.koreabaseball.com/Record/TeamRank/TeamRank.aspx"
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'}
 
 try:
-    response = requests.get(url_rank, headers=headers)
+    response = requests.get(url_rank, headers=headers, timeout=10)
     df_rank = pd.read_html(response.text)[0]
     st.dataframe(df_rank, use_container_width=True, hide_index=True)
-except Exception as e:
-    st.error(f"팀 순위 로딩 실패: {e}")
+except:
+    st.error("팀 순위 로딩에 실패했습니다.")
 
 st.markdown("---")
 
-# --- 선수 검색 ---
+# --- [섹션 2] 1군 선수 검색 (API 방식 필살기) ---
 st.header("🔍 1군 선수 검색")
 
-@st.cache_data(ttl=600)
-def get_all_players():
-    teams = {'OB':'두산', 'LG':'LG', 'SK':'SSG', 'LT':'롯데', 'SS':'삼성', 'HT':'KIA', 'HE':'한화', 'NC':'NC', 'KT':'KT', 'WO':'키움'}
-    player_data = []
-    errors = []
-
-    for code, team_name in teams.items():
-        try:
-            url = f"https://www.koreabaseball.com/Player/Search.aspx?teamCode={code}"
-            res = requests.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(res.text, 'html.parser')
-            rows = soup.select('.tEx tbody tr')
-            
-            for row in rows:
-                cols = row.find_all('td')
-                if len(cols) > 3:
-                    p_name = cols[1].text.strip()
-                    p_pos = cols[3].text.strip()
-                    player_data.append({'팀': team_name, '이름': p_name, '포지션': p_pos})
-        except Exception as e:
-            errors.append(f"{team_name}: {str(e)}")
-            continue
+@st.cache_data(ttl=3600)
+def get_players_api():
+    # KBO의 검색 데이터를 관리하는 내부 주소입니다.
+    # HTML을 긁는게 아니라 데이터만 쏙 가져옵니다.
+    api_url = "https://www.koreabaseball.com/ws/Player/PlayerSearch.ashx"
     
-    return pd.DataFrame(player_data), errors
+    # 10개 팀의 데이터를 한 번에 가져오기 위한 설정
+    teams = ['OB', 'LG', 'SK', 'LT', 'SS', 'HT', 'HE', 'NC', 'KT', 'WO']
+    all_players = []
 
-with st.spinner('선수 명단을 불러오는 중...'):
-    df_players, err_list = get_all_players()
+    for team in teams:
+        try:
+            # 팀별로 데이터를 요청합니다.
+            params = {'teamCode': team}
+            res = requests.post(api_url, data=params, headers=headers, timeout=10)
+            data = res.json() # 결과가 JSON(데이터 덩어리)으로 옵니다.
+            
+            # 받아온 데이터에서 필요한 정보만 추출
+            for p in data['rows']:
+                all_players.append({
+                    '팀': p['TEAM_NM'],
+                    '이름': p['PLAYER_NM'],
+                    '포지션': p['POSITION']
+                })
+        except:
+            continue
+            
+    return pd.DataFrame(all_players)
 
-# 만약 에러가 있었다면 화면에 작게 표시 (진단용)
-if err_list:
-    with st.expander("⚠️ 데이터 수집 중 발생한 기술적 문제 보기"):
-        for err in err_list:
-            st.write(err)
+# 데이터 불러오기
+with st.spinner('KBO 서버에서 선수 명단을 직접 가져오는 중...'):
+    df_players = get_players_api()
 
-search_query = st.text_input("찾고 싶은 선수 이름을 입력하세요")
+# 검색창
+search_query = st.text_input("찾고 싶은 선수 이름을 입력하세요 (예: 강백호)")
 
 if search_query:
     if not df_players.empty:
+        # 검색 결과 필터링
         result = df_players[df_players['이름'].str.contains(search_query.strip())]
         if not result.empty:
-            st.success(f"검색 결과")
+            st.success(f"'{search_query}' 검색 결과")
             st.dataframe(result, use_container_width=True, hide_index=True)
         else:
             st.warning("선수를 찾을 수 없습니다.")
     else:
-        st.error("선수 명단 데이터가 비어있습니다. KBO 서버에서 접속을 차단했을 수 있습니다.")
+        st.error("KBO 서버가 접속을 거부했습니다. 이 기능은 현재 질문자님 컴퓨터(로컬)에서만 작동할 수 있습니다.")
 
 st.snow()
