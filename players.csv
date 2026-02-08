@@ -1,0 +1,20 @@
+import pandas as pd
+import requests
+
+def save_players_to_csv():
+    api_url = "https://www.koreabaseball.com/ws/Player/PlayerSearch.ashx"
+    teams = ['OB', 'LG', 'SK', 'LT', 'SS', 'HT', 'HE', 'NC', 'KT', 'WO']
+    all_players = []
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    for team in teams:
+        res = requests.post(api_url, data={'teamCode': team}, headers=headers)
+        data = res.json()
+        for p in data['rows']:
+            all_players.append({'팀': p['TEAM_NM'], '이름': p['PLAYER_NM'], '포지션': p['POSITION']})
+    
+    df = pd.DataFrame(all_players)
+    df.to_csv('players.csv', index=False, encoding='utf-8-sig')
+    print("players.csv 파일 생성 완료!")
+
+save_players_to_csv()
