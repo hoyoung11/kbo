@@ -1,0 +1,44 @@
+name: Update Player Data
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # 매일 한국 시간 새벽 3시 실행
+  workflow_dispatch: # 수동으로도 실행 가능하게 설정
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          pip install pandas requests
+      - name: Run scraper
+        run: |
+          python -c "
+          import pandas as pd
+          import requests
+          api_url = 'https://www.koreabaseball.com/ws/Player/PlayerSearch.ashx'
+          teams = ['OB', 'LG', 'SK', 'LT', 'SS', 'HT', 'HE', 'NC', 'KT', 'WO']
+          all_players = []
+          for team in teams:
+              try:
+                  res = requests.post(api_url, data={'teamCode': team}, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+                  data = res.json()
+                  for p in data['rows']:
+                      all_players.append({'팀': p['TEAM_NM'], '이름': p['PLAYER_NM'], '포지션': p['POSITION']})
+              except: continue
+          df = pd.DataFrame(all_players)
+          df.to_csv('players.csv', index=False, encoding='utf-8-sig')
+          "
+      - name: Commit and push if changed
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git add players.csv
+          git commit -m "Update players.csv" || exit 0
+          git push
