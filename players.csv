@@ -1,20 +1,31 @@
-import pandas as pd
-import requests
-
-def save_players_to_csv():
-    api_url = "https://www.koreabaseball.com/ws/Player/PlayerSearch.ashx"
-    teams = ['OB', 'LG', 'SK', 'LT', 'SS', 'HT', 'HE', 'NC', 'KT', 'WO']
-    all_players = []
-    headers = {'User-Agent': 'Mozilla/5.0'}
-
-    for team in teams:
-        res = requests.post(api_url, data={'teamCode': team}, headers=headers)
-        data = res.json()
-        for p in data['rows']:
-            all_players.append({'팀': p['TEAM_NM'], '이름': p['PLAYER_NM'], '포지션': p['POSITION']})
-    
-    df = pd.DataFrame(all_players)
-    df.to_csv('players.csv', index=False, encoding='utf-8-sig')
-    print("players.csv 파일 생성 완료!")
-
-save_players_to_csv()
+﻿팀,이름,포지션
+KIA,김도영,내야수
+KIA,양현종,투수
+KIA,나성범,외야수
+LG,홍창기,외야수
+LG,박동원,포수
+LG,임찬규,투수
+삼성,구자욱,외야수
+삼성,원태인,투수
+삼성,김영웅,내야수
+두산,양의지,포수
+두산,곽빈,투수
+두산,허경민,내야수
+KT,강백호,포수
+KT,고영표,투수
+KT,로하스,외야수
+SSG,최정,내야수
+SSG,김광현,투수
+SSG,에레디아,외야수
+롯데,윤동희,외야수
+롯데,황성빈,외야수
+롯데,박세웅,투수
+한화,류현진,투수
+한화,노시환,내야수
+한화,안치홍,내야수
+NC,박건우,외야수
+NC,김주원,내야수
+NC,손아섭,외야수
+키움,송성문,내야수
+키움,김혜성,내야수
+키움,이주형,외야수
